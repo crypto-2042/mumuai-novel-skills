@@ -22,7 +22,6 @@ mumu-openclaw-skills/
 ├── README.md               # This documentation
 ├── SKILL.md                # System metadata & behavior injection for OpenClaw
 ├── .env.example            # Environment variables template
-├── assets/                 # Skill Icon
 └── scripts/                # Core scripts for the agent
     ├── client.py           # Authenticated API Client with automatic session management
     ├── bind_project.py     # Create / Link novel projects & Fix writing styles

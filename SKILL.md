@@ -5,7 +5,6 @@ license: GPL-3.0
 metadata:
   version: 1.0.0
   author: Nicholas Kevin <crypto2042@outlook.com>
-  icon: assets/icon.png
   tags:
     - novel-automation
     - editor
