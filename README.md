@@ -11,19 +11,19 @@ This repository provides a set of highly automated **Agentic AI skills** allowin
 
 ## 📸 Demo In Action
 
-![Agent Writing Novel](assets/banner.png)
+![Agent Writing Novel](.github/images/banner.png)
 
 With these skills, an agent transitions from being a simple text generator into a full **Showrunner/Editor-in-Chief**. It can maintain lore consistency, trigger background story-arc generation, read un-audited chapters, audit them using global memory RAG, and push massive rewrites.
 
 ## 📦 Directory Structure
 
 ```text
-mumu-agent-skills/
+mumu-openclaw-skills/
 ├── README.md               # This documentation
 ├── SKILL.md                # System metadata & behavior injection for OpenClaw
-├── requirements.txt        # Python dependencies
 ├── .env.example            # Environment variables template
-└── mumu_agent/             # Core scripts for the agent
+├── assets/                 # Skill Icon
+└── scripts/                # Core scripts for the agent
     ├── client.py           # Authenticated API Client with automatic session management
     ├── bind_project.py     # Create / Link novel projects & Fix writing styles
     ├── generate_outline.py # Brainstorm & stream new outlines via SSE plot expansion
@@ -45,10 +45,10 @@ openclaw install skill github:crypto-2042/mumu-openclaw-skills
 
 ### Method B: Manual Python Installation (For Standard Agents)
 
-1. **Install Dependencies & Package:**
-   Because this is bundled with a `pyproject.toml`, you can simply install it globally so your agent can run the scripts anywhere:
+1. **Install Dependencies:**
+   Because this skill conforms strictly to the OpenClaw standard, you can install the required dependencies manually:
    ```bash
-   pip install .
+   pip install requests python-dotenv
    ```
 
 2. **Configure Environment:**
@@ -66,7 +66,7 @@ If you are setting up an OpenClaw Agent, simply attach `SKILL.md` to its initial
 The AI creates a new fictional universe (world building, career paths, character sheets) securely pinning them to its local state lock `(.env)`.
 ```bash
 # Example action the agent will run:
-python -m mumu_agent.bind_project --action create \
+python scripts/bind_project.py --action create \
   --title "Cyber Dawn" \
   --description "A story about a rogue AI" \
   --theme "Survival" \
@@ -77,22 +77,22 @@ python -m mumu_agent.bind_project --action create \
 Once the novel is bound, the agent will loop the following cognitive steps ad-infinitum:
 
 1. **Check Loose Ends:** 
-   `python -m mumu_agent.check_foreshadows --action list-pending`
+   `python scripts/check_foreshadows.py --action list-pending`
    *Agent realizes a gun was shown in chapter 2 and hasn't fired yet.*
 
 2. **Generate Plot Outlines:** 
-   `python -m mumu_agent.generate_outline --count 5`
+   `python scripts/generate_outline.py --count 5`
 
 3. **Batch Write:** 
-   `python -m mumu_agent.trigger_batch --count 5`
+   `python scripts/trigger_batch.py --count 5`
    *This fires off the LLM engine and tells the MuMu backend to process RAG analysis immediately after.*
 
 4. **Inbox Review:** 
-   `python -m mumu_agent.fetch_unaudited`
+   `python scripts/fetch_unaudited.py`
    *Agent retrieves the completed draft of the chapter.*
 
 5. **Approval or Execution:** 
-   `python -m mumu_agent.review_chapter --action rewrite --chapter_id <ID> --file rewrite.md`
+   `python scripts/review_chapter.py --action rewrite --chapter_id <ID> --file rewrite.md`
    *Agent pushes a total rewrite into the server and publishes it!*
 
 ## 📜 License
