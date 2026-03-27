@@ -7,8 +7,13 @@ def main():
     parser.add_argument("--count", type=int, default=5, help="Number of chapters to outline")
     parser.add_argument("--mode", type=str, default="auto", choices=["auto", "new", "continue"])
     
+    parser.add_argument("--project_id", type=str, help="The bound Novel Project ID (Required if not in env)")
+    parser.add_argument("--style_id", type=str, help="The bound Style ID (Optional, overrides .env)")
     args = parser.parse_args()
-    client = MumuClient()
+    client = MumuClient(project_id=args.project_id, style_id=getattr(args, 'style_id', None))
+    if not client.project_id:
+        print("Error: --project_id argument is required or must be set in .env")
+        return
     
     print(f"Triggering outline generation ({args.mode}) for {args.count} chapters on project {client.project_id}...")
     try:
@@ -21,23 +26,26 @@ def main():
         print("Waiting for outline generation to complete (this may take a few minutes)...")
         
         final_result = None
-        for line in resp.iter_lines():
-            if line:
-                decoded = line.decode('utf-8')
-                if decoded.startswith("data: "):
-                    try:
-                        payload = json.loads(decoded[6:])
-                        if payload.get("type") == "parsing":
-                            print(f"[Agent Status] {payload.get('content')}")
-                        elif payload.get("type") == "saving":
-                            print(f"[Agent Status] {payload.get('content')}")
-                        elif payload.get("type") == "error":
-                            print(f"❌ Error: {payload.get('content')}")
-                            return
-                        elif payload.get("type") == "result":
-                            final_result = payload.get("data")
-                    except:
-                        pass
+        try:
+            for line in resp.iter_lines():
+                if line:
+                    decoded = line.decode('utf-8')
+                    if decoded.startswith("data: "):
+                        try:
+                            payload = json.loads(decoded[6:])
+                            if payload.get("type") == "parsing":
+                                print(f"[Agent Status] {payload.get('content')}")
+                            elif payload.get("type") == "saving":
+                                print(f"[Agent Status] {payload.get('content')}")
+                            elif payload.get("type") == "error":
+                                print(f"❌ Error: {payload.get('content')}")
+                                return
+                            elif payload.get("type") == "result":
+                                final_result = payload.get("data")
+                        except json.JSONDecodeError:
+                            pass
+        finally:
+            resp.close()
                         
         print("\n=== OUTLINE GENERATION REPORT ===")
         if final_result:

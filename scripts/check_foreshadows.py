@@ -3,10 +3,15 @@ from client import MumuClient
 
 def main():
     parser = argparse.ArgumentParser(description="Pulls recent RAG memories and unresolved foreshadowing")
-    parser.add_argument("--action", choices=["list-pending", "list-memories"], default="list-pending", help="Action to perform")
+    parser.add_argument("--action", choices=["list-pending"], default="list-pending", help="Action to perform")
     
+    parser.add_argument("--project_id", type=str, help="The bound Novel Project ID (Required if not in env)")
+    parser.add_argument("--style_id", type=str, help="The bound Style ID (Optional, overrides .env)")
     args = parser.parse_args()
-    client = MumuClient()
+    client = MumuClient(project_id=args.project_id, style_id=getattr(args, 'style_id', None))
+    if not client.project_id:
+        print("Error: --project_id argument is required or must be set in .env")
+        return
     
     if args.action == "list-pending":
         print(f"Fetching unresolved plot hooks and foreshadows for project {client.project_id}...")
@@ -23,16 +28,5 @@ def main():
         except Exception as e:
             print(f"Failed to fetch pending foreshadows: {e}")
             
-    elif args.action == "list-memories":
-        print(f"Fetching recent important story memories for project {client.project_id}...")
-        try:
-            resp = client.get(f"memories/projects/{client.project_id}", params={"limit": 20})
-            print("\n=== Recent Story Memories ===")
-            for m in resp.get("items", []):
-                 print(f"- [{m.get('memory_type')}] {m.get('content')} (Score: {m.get('importance_score', 0)})")
-            print("=============================")
-        except Exception as e:
-            print(f"Failed to fetch memories: {e}")
-
 if __name__ == "__main__":
     main()

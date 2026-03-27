@@ -3,8 +3,13 @@ from client import MumuClient
 
 def main():
     parser = argparse.ArgumentParser(description="Fetch Unaudited Chapters")
+    parser.add_argument("--project_id", type=str, help="The bound Novel Project ID (Required if not in env)")
+    parser.add_argument("--style_id", type=str, help="The bound Style ID (Optional, overrides .env)")
     args = parser.parse_args()
-    client = MumuClient()
+    client = MumuClient(project_id=args.project_id, style_id=getattr(args, 'style_id', None))
+    if not client.project_id:
+        print("Error: --project_id argument is required or must be set in .env")
+        return
     
     print(f"Fetching recently generated (unaudited) chapters for project {client.project_id}...")
     
@@ -14,13 +19,13 @@ def main():
         
         found = False
         for item in resp.get("items", []):
-            if item.get("status") == "draft" and item.get("word_count", 0) > 0:
-                found = True
-                print(f"- Chapter ID: {item['id']} | Title: {item['title']} | Words: {item.get('word_count')}")
-                print(  item.get('content', '')[:300] + "...\n")
+            found = True
+            print(f"- Chapter ID: {item['id']} | Title: {item['title']} | Status: {item.get('status')} | Words: {item.get('word_count')}")
+            if item.get("word_count", 0) > 0:
+                print(  item.get('content', '')[:100] + "...\n")
                 
         if not found:
-            print("No new generated chapters waiting for audit.")
+            print("No chapters found in this project.")
             
     except Exception as e:
         print(f"Failed to fetch chapters: {e}")

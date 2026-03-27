@@ -49,6 +49,7 @@ rewrite.md
 *.log
 *.swp
 .DS_Store
+docs/
 
 # ClawHub release directory
 release/
