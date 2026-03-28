@@ -8,6 +8,12 @@ MUMU_USERNAME = os.getenv("MUMU_USERNAME", "admin")
 MUMU_PASSWORD = os.getenv("MUMU_PASSWORD", "admin123")
 DEFAULT_TIMEOUT = float(os.getenv("MUMU_HTTP_TIMEOUT", "60"))
 
+
+def get_request_timeout(stream=False):
+    if stream:
+        return (DEFAULT_TIMEOUT, None)
+    return DEFAULT_TIMEOUT
+
 def get_session_file():
     session_file = os.getenv("MUMU_SESSION_FILE")
     if not session_file:
@@ -81,14 +87,14 @@ class MumuClient:
 
     def get(self, endpoint, **kwargs):
         url = f"{MUMU_API_URL}/api/{endpoint.lstrip('/')}"
-        kwargs.setdefault("timeout", DEFAULT_TIMEOUT)
+        kwargs.setdefault("timeout", get_request_timeout())
         resp = self.session.get(url, **kwargs)
         resp.raise_for_status()
         return resp.json()
 
     def post(self, endpoint, json_data=None, data=None, **kwargs):
         url = f"{MUMU_API_URL}/api/{endpoint.lstrip('/')}"
-        kwargs.setdefault("timeout", DEFAULT_TIMEOUT)
+        kwargs.setdefault("timeout", get_request_timeout(stream=bool(kwargs.get("stream"))))
         resp = self.session.post(url, json=json_data, data=data, **kwargs)
         if kwargs.get('stream'):
             resp.raise_for_status()
@@ -98,7 +104,7 @@ class MumuClient:
 
     def put(self, endpoint, json_data=None, data=None, **kwargs):
         url = f"{MUMU_API_URL}/api/{endpoint.lstrip('/')}"
-        kwargs.setdefault("timeout", DEFAULT_TIMEOUT)
+        kwargs.setdefault("timeout", get_request_timeout())
         resp = self.session.put(url, json=json_data, data=data, **kwargs)
         resp.raise_for_status()
         return resp.json()

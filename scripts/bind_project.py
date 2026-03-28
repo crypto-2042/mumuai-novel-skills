@@ -12,6 +12,14 @@ WIZARD_STAGES = {
 }
 
 
+def build_outline_payload(project):
+    payload = {
+        "project_id": project["id"],
+        "narrative_perspective": project.get("narrative_perspective") or "第三人称",
+    }
+    return payload
+
+
 def get_wizard_stage_label(project):
     if is_project_ready(project):
         return "completed"
@@ -62,6 +70,7 @@ def emit_project_status(project, json_mode=False):
 def wait_for_sse(resp, step_name):
     print(f"--- Running: {step_name} ---")
     final_result = None
+    chunk_count = 0
     try:
         for line in resp.iter_lines():
             if line:
@@ -70,12 +79,17 @@ def wait_for_sse(resp, step_name):
                     try:
                         payload = json.loads(decoded[6:])
                         ptype = payload.get("type")
-                        if ptype in ["parsing", "saving", "heartbeat"]:
-                            pass  # keep console clean
-                        elif ptype == "generating":
-                            pass
+                        if ptype == "progress":
+                            message = payload.get("message")
+                            progress = payload.get("progress")
+                            if message:
+                                print(f"[{progress}%] {message}")
+                        elif ptype == "chunk":
+                            chunk_count += 1
+                            if chunk_count % 100 == 0:
+                                print(f"[stream] received {chunk_count} content chunks...")
                         elif ptype == "error":
-                            print(f"❌ Error during {step_name}: {payload.get('content')}")
+                            print(f"❌ Error during {step_name}: {payload.get('error')}")
                             sys.exit(1)
                         elif ptype == "result":
                             final_result = payload.get("data")
@@ -137,12 +151,7 @@ def run_next_stage(client, project, theme=None, genre=None):
     elif next_action == "outline":
         resp = client.post(
             "wizard-stream/outline",
-            json_data={
-                "project_id": project_id,
-                "chapter_count": 5,
-                "narrative_perspective": "第三人称",
-                "target_words": 1000000,
-            },
+            json_data=build_outline_payload(project),
             stream=True,
         )
         wait_for_sse(resp, "Outline")
