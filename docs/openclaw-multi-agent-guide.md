@@ -85,8 +85,15 @@ Once the project is `ready`, the `Writer` is responsible for forward production:
 
 ```bash
 python scripts/generate_outline.py --project_id <PROJECT_ID> --count 5
+python scripts/materialize_outlines.py --project_id <PROJECT_ID>
 python scripts/trigger_batch.py --project_id <PROJECT_ID> --style_id <STYLE_ID> --count 5
 ```
+
+Important constraints:
+
+- `generate_outline.py` extends the outline runway
+- `materialize_outlines.py` generates chapter plans from outlines, then calls `create-chapters-from-plans` to create chapter slots
+- `trigger_batch.py` only works when empty chapter slots already exist in the project
 
 The `Writer` should not approve publication quality or final chapter rewrites unless the team is deliberately collapsing roles.
 
@@ -100,6 +107,8 @@ python scripts/analyze_chapter.py --project_id <PROJECT_ID> --chapter_id <CHAPTE
 python scripts/review_chapter.py --project_id <PROJECT_ID> --action approve --chapter_id <CHAPTER_ID>
 python scripts/review_chapter.py --project_id <PROJECT_ID> --action rewrite --chapter_id <CHAPTER_ID> --content "<Full rewritten chapter text>"
 ```
+
+`fetch_unaudited.py` currently reads the full chapter list and highlights likely review candidates. It is not a strict server-side unaudited inbox.
 
 In the standard team:
 
@@ -197,13 +206,14 @@ This should be the only scheduling job that makes high-level continuation decisi
   - recent reader feedback is not clearly negative
 - allowed actions:
   - `generate_outline.py`
+  - `materialize_outlines.py`
   - `trigger_batch.py`
 
 ### 3. `editor-run`
 
 - owner identity: `book-a-chief-editor`
 - trigger conditions:
-  - unaudited chapters exist
+  - review candidates exist in the chapter list
 - allowed actions:
   - `fetch_unaudited.py`
   - `analyze_chapter.py`
@@ -231,6 +241,11 @@ This should be the only scheduling job that makes high-level continuation decisi
   - feedback is clearly negative or quality regressions are repeating
 
 Do not configure cron to blindly publish on a fixed rhythm. Cron should wake the team up to inspect state, then the team should decide whether to continue production.
+
+Additional notes:
+
+- `check_foreshadows.py` reads the `pending-resolve` queue, not the full set of stored foreshadows
+- a newly added foreshadow may not appear there immediately if it is not yet pending resolution in the current chapter context
 
 ## OpenClaw Deployment Notes
 

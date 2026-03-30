@@ -190,7 +190,7 @@ def get_next_wizard_action(project):
     return None
 
 
-def emit_project_status(project, json_mode=False):
+def build_status_payload(project, runtime_snapshot=None):
     payload = {
         "project_id": project.get("id"),
         "title": project.get("title"),
@@ -199,7 +199,20 @@ def emit_project_status(project, json_mode=False):
         "stage": get_wizard_stage_label(project),
         "ready": is_project_ready(project),
         "next_action": get_next_wizard_action(project),
+        "recommended_command": "done" if is_project_ready(project) else "advance",
     }
+    runtime_snapshot = runtime_snapshot or {}
+    if runtime_snapshot:
+        payload["runtime_status"] = runtime_snapshot.get("status")
+        payload["runtime_phase"] = runtime_snapshot.get("phase")
+        payload["runtime_subphase"] = runtime_snapshot.get("subphase")
+        payload["runtime_message"] = progress_message_from_state(runtime_snapshot)
+        payload["runtime_progress"] = runtime_snapshot.get("last_progress") or runtime_snapshot.get("progress")
+    return payload
+
+
+def emit_project_status(project, runtime_snapshot=None, json_mode=False):
+    payload = build_status_payload(project, runtime_snapshot=runtime_snapshot)
     if json_mode:
         print(json.dumps(payload, ensure_ascii=False))
         return
@@ -483,7 +496,9 @@ def main():
             print("Error: --project_id is required for status action.")
             return
         try:
-            emit_project_status(fetch_project(client, args.project_id), json_mode=args.json)
+            project = fetch_project(client, args.project_id)
+            runtime = load_runtime_snapshot(args.project_id)
+            emit_project_status(project, runtime_snapshot=runtime, json_mode=args.json)
         except Exception as e:
             print(f"Failed to fetch project status: {e}")
 
@@ -495,12 +510,16 @@ def main():
         try:
             while True:
                 project = fetch_project(client, args.project_id)
+                runtime = load_runtime_snapshot(args.project_id)
                 if is_project_ready(project):
-                    emit_project_status(project, json_mode=args.json)
+                    emit_project_status(project, runtime_snapshot=runtime, json_mode=args.json)
                     return
                 if time.monotonic() >= deadline:
                     print(f"Initialization is still in progress after {args.timeout} seconds.")
-                    emit_project_status(project, json_mode=args.json)
+                    if runtime:
+                        emit_advance_status(project, progress_state=runtime, json_mode=args.json)
+                    else:
+                        emit_project_status(project, runtime_snapshot=runtime, json_mode=args.json)
                     return
                 time.sleep(args.interval)
         except Exception as e:

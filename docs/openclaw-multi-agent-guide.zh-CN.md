@@ -80,8 +80,15 @@ python scripts/bind_project.py --action advance --project_id <PROJECT_ID> --budg
 
 ```bash
 python scripts/generate_outline.py --project_id <PROJECT_ID> --count 5
+python scripts/materialize_outlines.py --project_id <PROJECT_ID>
 python scripts/trigger_batch.py --project_id <PROJECT_ID> --style_id <STYLE_ID> --count 5
 ```
+
+需要注意：
+
+- `generate_outline.py` 负责扩纲
+- `materialize_outlines.py` 会先生成 chapter plans，再调用 `create-chapters-from-plans` 创建章节槽位
+- `trigger_batch.py` 只能在项目已经存在空章节槽位时工作
 
 `Writer` 不负责最终发布判断，也不应该直接批准章节。
 
@@ -95,6 +102,8 @@ python scripts/analyze_chapter.py --project_id <PROJECT_ID> --chapter_id <CHAPTE
 python scripts/review_chapter.py --project_id <PROJECT_ID> --action approve --chapter_id <CHAPTER_ID>
 python scripts/review_chapter.py --project_id <PROJECT_ID> --action rewrite --chapter_id <CHAPTER_ID> --content "<Full rewritten chapter text>"
 ```
+
+`fetch_unaudited.py` 当前会读取完整章节列表，并高亮可能需要审阅的章节，不是严格意义上的服务端待审 inbox。
 
 标准版团队中：
 
@@ -190,13 +199,14 @@ Reader 类 agent 必须像真实读者一样工作：
   - 最近读者反馈没有明显恶化
 - 允许动作：
   - `generate_outline.py`
+  - `materialize_outlines.py`
   - `trigger_batch.py`
 
 ### 3. `editor-run`
 
 - owner 身份：`book-a-chief-editor`
 - 触发条件：
-  - 存在 unaudited chapters
+  - 完整章节列表中存在待审候选
 - 允许动作：
   - `fetch_unaudited.py`
   - `analyze_chapter.py`
@@ -224,6 +234,11 @@ Reader 类 agent 必须像真实读者一样工作：
   - 反馈明显变差，或质量问题连续出现
 
 不要把 cron 配成“固定到点自动发布”。cron 的职责是定时唤醒检查，再由团队决定要不要继续生产。
+
+补充说明：
+
+- `check_foreshadows.py` 读取的是 `pending-resolve` 视图，不等于项目中的全部伏笔
+- 新增伏笔后，若暂未进入待回收集合，`check_foreshadows.py` 可能不会立即显示它
 
 ## OpenClaw 部署建议
 

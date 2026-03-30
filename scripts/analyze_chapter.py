@@ -2,6 +2,31 @@ import time
 import argparse
 from client import MumuClient
 
+
+def extract_report_fields(payload):
+    analysis = payload.get("analysis") if isinstance(payload, dict) else None
+    source = analysis if isinstance(analysis, dict) else payload
+    return {
+        "overall_quality_score": source.get("overall_quality_score"),
+        "coherence_score": source.get("coherence_score"),
+        "engagement_score": source.get("engagement_score"),
+        "pacing_score": source.get("pacing_score"),
+        "analysis_report": source.get("analysis_report") or source.get("comprehensive_review"),
+        "suggestions": source.get("suggestions") or [],
+        "hooks": source.get("hooks") or [],
+        "foreshadows": source.get("foreshadows") or [],
+    }
+
+
+def build_score_summary(report):
+    return (
+        f"Scores: Overall({report.get('overall_quality_score')}) | "
+        f"Coherence({report.get('coherence_score')}) | "
+        f"Engagement({report.get('engagement_score')}) | "
+        f"Pacing({report.get('pacing_score')})"
+    )
+
+
 def main():
     parser = argparse.ArgumentParser(description="Trigger System RAG Analysis for a chapter")
     parser.add_argument("--chapter_id", required=True, help="Chapter ID to analyze")
@@ -37,9 +62,18 @@ def main():
             
         # Fetch the actual report
         report_resp = client.get(f"chapters/{args.chapter_id}/analysis")
+        report = extract_report_fields(report_resp)
         print("\n=== SYSTEM RAG ANALYSIS REPORT ===")
-        print(f"Scores: Plot({report_resp.get('plot_consistency_score')}) | Character({report_resp.get('character_consistency_score')}) | Writing({report_resp.get('writing_quality_score')})")
-        print(report_resp.get('comprehensive_review', 'No comprehensive review returned.'))
+        print(build_score_summary(report))
+        print(report.get('analysis_report') or 'No comprehensive review returned.')
+        if report.get("suggestions"):
+            print("\nSuggestions:")
+            for item in report["suggestions"]:
+                print(f"- {item}")
+        if report.get("hooks"):
+            print(f"\nHooks detected: {len(report['hooks'])}")
+        if report.get("foreshadows"):
+            print(f"Foreshadows detected: {len(report['foreshadows'])}")
         print("==================================")
         print("Note: If the report shows inconsistencies or missing plot goals, use review_chapter.py --action rewrite")
     except Exception as e:

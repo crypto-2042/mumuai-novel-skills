@@ -36,11 +36,13 @@ mumu-openclaw-skills/
     ├── client.py           # Authenticated API Client with in-memory auth by default
     ├── bind_project.py     # Create / Link novel projects & Fix writing styles
     ├── generate_outline.py # Brainstorm & stream new outlines via SSE plot expansion
-    ├── trigger_batch.py    # Trigger remote batch-generation with automatic start-range detection
-    ├── fetch_unaudited.py  # Retrieve drafts that require review
+    ├── materialize_outlines.py # Turn outlines into chapter slots using the real MuMu flow
+    ├── trigger_batch.py    # Trigger remote batch-generation when chapter slots already exist
+    ├── check_batch_status.py # Query batch-generation task progress by batch_id
+    ├── fetch_unaudited.py  # List all chapters and highlight likely review candidates
     ├── analyze_chapter.py  # Run RAG analysis vs existing continuity
     ├── review_chapter.py   # Final overwrite or immediate pass for draft chapters
-    ├── check_foreshadows.py# Pull unresolved foreshadows & memory hooks
+    ├── check_foreshadows.py# Pull the pending-resolve foreshadow queue
     └── manage_memory.py    # Manually assert or reject memory nodes
 ```
 
@@ -54,39 +56,54 @@ clawhub install mumuai-novel-skills
 
 After installation, make sure the runtime provides:
 ```bash
+cat >> ~/.zprofile <<'EOF'
 export MUMU_API_URL="https://your-mumu-host"
 export MUMU_USERNAME="your-account"
 export MUMU_PASSWORD="your-password"
+EOF
+source ~/.zprofile
 ```
 
 If you run multiple agents in the same shared workspace, also set a distinct owner ID per agent or session so runtime progress files are not mistaken for each other:
 ```bash
+cat >> ~/.zprofile <<'EOF'
 export MUMU_OWNER_ID="novel-agent-a"
+EOF
+source ~/.zprofile
 ```
 
 ### Method B: Use in Codex
 
-Codex supports skills, and OpenAI states that ChatGPT/Codex skills follow the Agent Skills open standard. In practice, this repository can be used as a local skill bundle because it is already organized around a root `SKILL.md` plus supporting scripts.
+Install this skill directly inside Codex:
 
-1. Install Python dependency:
+1. Open Codex and choose `Skill Installer`.
+2. Paste the GitHub repo URL:
+   ```text
+   https://github.com/crypto-2042/mumu-openclaw-skills
+   ```
+3. Restart Codex so it picks up the new skill.
+4. Install Python dependency:
    ```bash
    pip install requests
    ```
-2. Provide runtime env vars:
+5. Write the required runtime env vars into `~/.zprofile`:
    ```bash
+   cat >> ~/.zprofile <<'EOF'
    export MUMU_API_URL="https://your-mumu-host"
    export MUMU_USERNAME="your-account"
    export MUMU_PASSWORD="your-password"
-   ```
-   If multiple Codex agents may work from the same workspace, also set:
-   ```bash
    export MUMU_OWNER_ID="codex-agent-a"
+   EOF
+   source ~/.zprofile
    ```
-3. Install or link this repository into your Codex skills environment, then invoke the skill from Codex.
+6. Invoke the skill from Codex.
 
-If your Codex environment supports skill-local persistent files and you want to reuse login cookies across calls, also set:
+If your Codex environment supports skill-local persistent files and you want to reuse login cookies across calls, also add this to `~/.zprofile`:
 ```bash
+cat >> ~/.zprofile <<'EOF'
 export MUMU_SESSION_FILE="/safe/writable/path/mumu-session.json"
+EOF
+source ~/.zprofile
 ```
 
 ### Method C: Use in Claude Code
@@ -126,7 +143,7 @@ Claude Code does not read OpenClaw skills directly. Its native extension points 
    source .env
    set +a
    ```
-   *Note: OpenClaw can inject skill env vars directly, so `.env` export is mainly for manual shell usage. From version 1.0.5 onwards, agents are expected to memorize their `Project ID` and `Style ID` intrinsically and pass them via the `--project_id` and `--style_id` flags to support concurrent multi-agent executions in the same workspace. Login cookies are kept in-process by default; if your runtime provides a safe writable path, you can opt into persistence with `MUMU_SESSION_FILE=/safe/path/session.json`. If multiple agents share one workspace, set a distinct `MUMU_OWNER_ID` for each agent so `.mumu_runtime/` state files are not treated as reusable by another agent.*
+   *Note: OpenClaw can inject skill env vars directly, so `.env` export is mainly for manual shell usage. From version 1.0.6 onwards, agents are expected to memorize their `Project ID` and `Style ID` intrinsically and pass them via the `--project_id` and `--style_id` flags to support concurrent multi-agent executions in the same workspace. Login cookies are kept in-process by default; if your runtime provides a safe writable path, you can opt into persistence with `MUMU_SESSION_FILE=/safe/path/session.json`. If multiple agents share one workspace, set a distinct `MUMU_OWNER_ID` for each agent so `.mumu_runtime/` state files are not treated as reusable by another agent.*
 
 ## ⏳ Stage-Based Initialization
 
@@ -163,6 +180,8 @@ Use the initialization actions like this:
    ```bash
    python scripts/bind_project.py --action ready --project_id <PROJECT_ID>
    ```
+
+`status` now includes the local runtime snapshot when available. If you care about subphase-level progress, prefer `advance`. When `wait` times out and a runtime snapshot exists, it will return advance-style progress details instead of only the raw `wizard_step`.
 
 Do not move on to batch generation, chapter auditing, or rewrite flows until the project reports `ready`.
 
@@ -225,18 +244,31 @@ Once the novel is initialized and ready, the agent will loop the following cogni
 
 2. **Generate Plot Outlines:** 
    `python scripts/generate_outline.py --project_id <Your ID> --count 5`
+   *This expands the story runway by creating outlines.*
 
-3. **Batch Write:** 
+3. **Materialize Chapter Slots:**
+   `python scripts/materialize_outlines.py --project_id <Your ID>`
+   *This follows the real MuMu Web flow: generate chapter plans from outlines, then create chapter slots from those plans.*
+
+4. **Batch Write:** 
    `python scripts/trigger_batch.py --project_id <Your ID> --count 5`
-   *This fires off the LLM engine and tells the MuMu backend to process RAG analysis immediately after.*
+   *Only use this when the project already has empty chapter slots.*
+   *Add `--wait` if you want the command to poll until the batch completes or times out.*
 
-4. **Inbox Review:** 
+5. **Check Batch Status:**
+   `python scripts/check_batch_status.py --project_id <Your ID> --batch_id <Batch_ID>`
+
+6. **Inbox Review:** 
    `python scripts/fetch_unaudited.py --project_id <Your ID>`
-   *Agent retrieves the completed draft of the chapter.*
+   *This reads the full chapter list and highlights likely review candidates. It is not a strict server-side unaudited inbox.*
 
-5. **Approval or Execution:** 
+7. **Approval or Execution:** 
    `python scripts/review_chapter.py --project_id <Your ID> --action rewrite --chapter_id <Chapter_ID> --content "<Full rewritten chapter text>"`
    *File input via `--file rewrite.md` is still available as a fallback when the runtime supports it.*
+
+Known limitations:
+
+- `check_foreshadows.py` reads the `pending-resolve` queue, not the full set of stored foreshadows.
 
 ## 📜 License
 GPL-3.0 License. See the main MuMuAINovel project for more details.

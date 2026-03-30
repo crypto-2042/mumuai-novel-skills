@@ -2,6 +2,17 @@ import json
 import argparse
 from client import MumuClient
 
+
+def extract_error_message(payload):
+    return (
+        payload.get("content")
+        or payload.get("message")
+        or payload.get("detail")
+        or payload.get("error")
+        or "Unknown outline generation error"
+    )
+
+
 def main():
     parser = argparse.ArgumentParser(description="Trigger AI Outline Generation")
     parser.add_argument("--count", type=int, default=5, help="Number of chapters to outline")
@@ -38,7 +49,7 @@ def main():
                             elif payload.get("type") == "saving":
                                 print(f"[Agent Status] {payload.get('content')}")
                             elif payload.get("type") == "error":
-                                print(f"❌ Error: {payload.get('content')}")
+                                print(f"❌ Error: {extract_error_message(payload)}")
                                 return
                             elif payload.get("type") == "result":
                                 final_result = payload.get("data")
@@ -52,7 +63,7 @@ def main():
             print(f"Total new chapters outlined: {final_result.get('new_chapters', 0)}")
             print(f"Message: {final_result.get('message', '')}")
             print("Successfully expanded the novel's creative runway.")
-            print("Use trigger_batch.py next to write the actual text!")
+            print("If the project still has no chapter slots, run materialize_outlines.py next before trigger_batch.py.")
         else:
             print("Completed, but no final result payload was captured. Please check the MuMu console.")
             
